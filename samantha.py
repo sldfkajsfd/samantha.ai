@@ -2,6 +2,7 @@ import anthropic
 import os
 from dotenv import load_dotenv
 from memory import save_memory, search_memory
+from emotion import detect_emotion
 
 load_dotenv()
 
@@ -19,6 +20,9 @@ while True:
     # 장기 기억 검색
     related_memories = search_memory(user_input)
     memory_context = "\n".join(related_memories)
+
+    # 감정 감지
+    emotion = detect_emotion(user_input)
     
     # 단기 기억 (최근 6개)
     short_term.append({"role": "user", "content": user_input})
@@ -37,7 +41,7 @@ while True:
     response = client.messages.create(
         model="claude-haiku-4-5",
         max_tokens=1024,
-        system="너는 사만다야. 주어진 관련 기억과 대화 흐름을 참고해서 대화해.",
+        system=f"너는 사만다야. 주어진 관련 기억과 대화 흐름을 참고해서 대화해.\n사용자의 현재 감정 상태: {emotion}\n감정에 맞게 말투를 조절해.",
         messages=messages
     )
     
