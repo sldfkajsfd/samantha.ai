@@ -3,6 +3,8 @@ import os
 from dotenv import load_dotenv
 from memory import save_memory, search_memory
 from emotion import detect_emotion
+from voice import speak
+from listen import listen
 
 load_dotenv()
 
@@ -11,7 +13,8 @@ client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 short_term = []
 
 while True:
-    user_input = input("나: ")
+    user_input = listen()
+    print(f"나: {user_input}")
     
     if user_input == "종료":
         print("대화 종료.")
@@ -47,6 +50,8 @@ while True:
     
     reply = response.content[0].text
     print(f"사만다: {reply}\n")
+    speak(reply)
+
     
     short_term.append({"role": "assistant", "content": reply})
     
