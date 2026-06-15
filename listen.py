@@ -1,8 +1,10 @@
+import os
+os.environ["PATH"] = r"C:\ffmpeg\bin" + os.pathsep + os.environ.get("PATH", "")
 import sounddevice as sd
 import soundfile as sf
 import whisper
 import tempfile
-import os
+
 
 model = whisper.load_model("base")
 
@@ -17,6 +19,9 @@ def listen():
     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
         sf.write(f.name, audio, sample_rate)
         result = model.transcribe(f.name, language="ko")
-        os.unlink(f.name)
+        try:
+          os.unlink(f.name)
+        except PermissionError:
+           pass
 
     return result["text"]
