@@ -2,3 +2,4 @@ venv/
 history.json
 __pycache__/
 .env
+relationship.json

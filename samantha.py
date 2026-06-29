@@ -5,18 +5,15 @@ from memory import save_memory, search_memory
 from emotion import detect_emotion
 from voice import speak
 from listen import listen
-from persona import get_persona_prompt
+from persona import build_system_prompt
+from relationship import increment_turn
+from inference import inference, save_inference, search_inference
 
 load_dotenv()
 
 client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
 short_term = []
-
-def build_system_prompt(emotion: str) -> str:
-    persona = get_persona_prompt()
-    emotion_instruction = f"\n\n## 현재 사용자 감정 상태\n감지된 감정: {emotion}\n이 감정에 맞게 말투와 톤을 조절해."
-    return persona + emotion_instruction
 
 while True:
     # STT를 이용한 대화 시작
@@ -36,8 +33,13 @@ while True:
     related_memories = search_memory(user_input)
     memory_context = "\n".join(related_memories)
 
+    # 나에 대한 추론 검색
+    related_inference = search_inference(user_input)
+    inference_context = "\n".join(related_inference)
+
     # 감정 감지
     emotion = detect_emotion(user_input)
+    increment_turn()
     
     # 단기 기억 (최근 6개)
     short_term.append({"role": "user", "content": user_input})
@@ -45,7 +47,7 @@ while True:
     messages = [
         {
             "role": "user",
-            "content": f"[관련 기억]\n{memory_context}"
+            "content": f"[관련 기억]\n{memory_context}\n\n[추론 기억]\n{inference_context}"
         },
         {
             "role": "assistant",
@@ -75,3 +77,8 @@ while True:
     # 장기 기억에 저장
     save_memory(f"나: {user_input}")
     save_memory(f"사만다: {reply}")
+
+    # 나에 대한 추론을 저장
+    # user_input -> 인사이트 반환 -> 인사이트 db 저장 -> db 인사이트 참고하게 유도.
+    inference_data = inference(f"나: {user_input}")
+    save_inference(inference_data)
