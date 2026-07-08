@@ -4,7 +4,7 @@
 import json
 import os
 
-# 설계 요약: 대화 횟수를 파일에 저장하고, 횟수에 따라 레벨을 계산해서, 그 레벨에 맞는 말투 지침을 돌려준다.
+# Design summary: store the turn count in a file, compute a level from the count, and return the speech-style guide for that level (설계 요약: 대화 횟수를 파일에 저장하고, 횟수에 따라 레벨을 계산해서, 그 레벨에 맞는 말투 지침을 돌려준다)
 
 RELATIONSHIP_FILE = "relationship.json"
 
@@ -41,14 +41,14 @@ LEVELS = [
     }
 ]
 
-# relationship.json 읽기
+# Read relationship.json (relationship.json 읽기)
 def load_relationship():
     if os.path.exists(RELATIONSHIP_FILE):
         with open(RELATIONSHIP_FILE, "r") as f:
             return json.load(f)
     return {"total_turns": 0, "level": 1}
 
-# relationship.json 쓰기
+# Write relationship.json (relationship.json 쓰기)
 def save_relationship(data):
     with open(RELATIONSHIP_FILE, "w") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)

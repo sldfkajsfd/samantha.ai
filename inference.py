@@ -8,8 +8,8 @@ load_dotenv()
 
 client = anthropic.Anthropic(api_key = os.getenv("ANTHROPIC_API_KEY"))
 
-## 대화에서 사만다가 나에 대한 인사이트 추론
- # anthropic api 호출 후 대답 return하는 과정
+## Samantha infers an insight about me from the conversation (대화에서 사만다가 나에 대한 인사이트 추론)
+ # Process of calling the anthropic api and returning the reply (anthropic api 호출 후 대답 return하는 과정)
 def inference(text: str) -> str:
   response = client.messages.create(
     model = "claude-haiku-4-5",
@@ -20,34 +20,34 @@ def inference(text: str) -> str:
   return response.content[0].text.strip().lower()
 
 
-## ChromaDB 별도 컬렉션에 저장
+## Store in a separate ChromaDB collection (ChromaDB 별도 컬렉션에 저장)
 model = SentenceTransformer("all-MiniLM-L6-v2")
 chroma_client = chromadb.PersistentClient(path="./inference_db")
 collection = chroma_client.get_or_create_collection("samantha_inference")
 
 def save_inference(text):
-    ## 텍스트를 숫자 벡터로 변환해주는 임베딩
+    ## Embedding that converts text into a numeric vector (텍스트를 숫자 벡터로 변환해주는 임베딩)
   embedding = model.encode(text).tolist()
   collection.add(
-    ## 원본 텍스트
+    ## Original text (원본 텍스트)
     documents = [text],
-    ## 숫자 벡터
+    ## Numeric vector (숫자 벡터)
     embeddings = [embedding],
-    ## 고유 식별자
-     # ids는 chromaDB 규칙 상 str이어야해서 변환하는 것임
+    ## Unique id (고유 식별자)
+     # ids must be str per ChromaDB convention, so it's converted (ids는 chromaDB 규칙 상 str이어야해서 변환하는 것임)
     ids = [str(collection.count())]
   )
 
-## 사만다가 추론 부분 참고하는 함수
+## Function Samantha uses to reference inferences (사만다가 추론 부분 참고하는 함수)
 def search_inference(query, n = 3):
     if collection.count() == 0:
       return []
     else:
-    # 현재 대화와 가장 관련된 3개의 문장을 chromaDB에서 골라온다.
+    # Pick the 3 sentences most related to the current conversation from ChromaDB (현재 대화와 가장 관련된 3개의 문장을 chromaDB에서 골라온다)
       embedding = model.encode(query).tolist()
       results = collection.query(
           query_embeddings=[embedding],
           n_results=n
       )
-    # 임베딩되어 있는 숫자들을 다시 문자로 변환한다.
+    # Convert the embedded numbers back into text (임베딩되어 있는 숫자들을 다시 문자로 변환한다)
       return results["documents"][0]

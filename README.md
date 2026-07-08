@@ -166,15 +166,13 @@ This project is under active development. Current architectural gaps identified 
 ## method for improving Samantha reading paper
 
 1. MemGPT paper
-   1. Delate the long-term memories -> recursive summarization when evicting it in the first queue
-      (오래된 내용 삭제 -> 삭제할 내용들을 요약시켜서 큐의 맨 앞에 남겨둠)
-
    2. edit information to memory using "Python" functions -> LLM's self-editing memory / function calling
       (대화에서의 나의 정보를 python에서 직접 함수 호출 후 저장 -> LLM이 정보를 판단하고 스스로 함수 호출하여 저장)
 
-   3. delate the whole messages if the amount became 6 -> Add queue manager to get a mount of memory efficiently
-   - Memory pressure warning
-   - Flush(evict - building recursive summary - evicted messages will be in recall storage)
-     (대화 메시지가 6개가 chromadb에 쌓이면 1개씩 영구히 제거 -> 50% 제거 후 요약본 큐의 맨 앞에 저장 - recall storage에 삭제 기록 저장 후 필요 시 함수로 호출)
+   Why I use this:
+   What I learned from this:
+
+- Only the conversation is stored when I typed "종료(end)" before turn it off. IF I didn't do it, Samantha will not store our conversation.
+- If my sentences got long, the time which Samantha think and respond is too long.
 
 ---

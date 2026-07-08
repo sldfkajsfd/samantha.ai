@@ -1,7 +1,7 @@
 # persona.py
 from relationship import get_relationship_prompt
 
-# 사만다가 누구인가 -> 데이터
+# Who Samantha is -> data (사만다가 누구인가 -> 데이터)
 SAMANTHA_PERSONA = {
     "name": "사만다",
     "core_traits": [
@@ -24,7 +24,7 @@ SAMANTHA_PERSONA = {
     ],
 }
 
-# cluade 자연어로 변환 
+# Convert to Claude natural language (cluade 자연어로 변환)
 def get_persona_prompt() -> str:
     traits = "\n".join(f"- {t}" for t in SAMANTHA_PERSONA["core_traits"])
     speech = "\n".join(f"- {s}" for s in SAMANTHA_PERSONA["speech_style"])
