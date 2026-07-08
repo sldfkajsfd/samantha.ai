@@ -20,8 +20,8 @@ I am still learning, so welcome all of your feedbacks!
 
 ## Key Features
 
-- **Long-term memory** — Stores and retrieves past conversations using vector search (ChromaDB + sentence-transformers)
-- **User inference engine** — Extracts personality insights from conversations and builds a persistent model of the user
+- **Long-term memory** — Recall storage (raw conversation log) + archival storage (curated facts), both ChromaDB + sentence-transformers, searched via LLM-directed tool use
+- **Working context** — A small, always-in-prompt set of stable facts (name, preferences, and other important information) the LLM writes to itself when it judges something worth remembering
 - **Emotion detection** — Classifies user emotion per turn and adjusts response tone accordingly
 - **Relationship engine** — Tracks conversational depth and evolves Samantha's communication style over time
 - **Persona system** — Consistent character with defined traits, values, and speech patterns
@@ -35,24 +35,24 @@ I am still learning, so welcome all of your feedbacks!
 User Input
     │
     ├── Emotion Detection (Claude Haiku)
-    ├── Long-term Memory Retrieval (ChromaDB vector search)
-    ├── User Inference Retrieval (ChromaDB — separate collection)
     │
     ▼
 Context Assembly
-    │   system prompt (persona + emotion + relationship level)
-    │   + memory context (top-3 relevant past conversations)
-    │   + inference context (top-3 relevant user insights)
-    │   + short-term memory (recent 6 turns, FIFO)
+    │   system prompt (persona + emotion + relationship level + memory tool guide)
+    │   + working context (stable facts: name, preferences, and other important information — always included)
+    │   + recursive summary (compressed history from past flushes)
+    │   + short-term memory (queue_manager.py: token-aware FIFO queue)
     │
     ▼
-Claude API (claude-haiku-4-5)
-    │
+Claude API (claude-haiku-4-5) ── tool use loop ──┐
+    │                                             │
+    │   search_recall_memory / search_archival_memory / save_to_archival_memory / update_working_context
+    │                                             │
+    ◄─────────────────────────────────────────────┘
     ▼
 Response
     ├── TTS Output (ElevenLabs)
-    ├── Save to long-term memory
-    └── Extract & save user insight (inference engine)
+    └── Queue manager: warn at 70% tokens, flush at 90% (evict + save raw to recall storage)
 ```
 
 ---
@@ -62,16 +62,20 @@ Response
 ```
 samantha/
 ├── samantha.py        — Main conversation loop; assembles context and calls Claude API
-├── memory.py          — Long-term memory: save/search past conversations via ChromaDB
-├── inference.py       — User inference engine: extract personality insights, save/search via ChromaDB
+├── queue_manager.py   — MemGPT-style short-term memory: token-aware FIFO queue, recursive summary, flush-to-memory
+├── recall_memory.py   — Recall storage: raw conversation log, auto-saved by queue_manager.py's flush(), searched via LLM tool use
+├── archival_memory.py — Archival storage: curated important facts, written/searched via LLM tool use
+├── working_context.py — Working context: stable facts (name, preferences, and other important information), always in-prompt, written via LLM tool use
 ├── emotion.py         — Emotion detection: classifies user input into joy/sadness/anger/anxiety/neutral
 ├── persona.py         — Samantha's character definition: traits, speech style, values
 ├── relationship.py    — Relationship engine: tracks turn count, adjusts communication style
 ├── voice.py           — TTS output via ElevenLabs API
 ├── listen.py          — STT input via OpenAI Whisper (local)
-├── memory_db/         — ChromaDB persistent storage (long-term memory)
-├── inference_db/      — ChromaDB persistent storage (user inference)
+├── memory_db/         — ChromaDB persistent storage (recall storage)
+├── archival_db/       — ChromaDB persistent storage (archival storage)
 ├── relationship.json  — Persistent relationship state
+├── queue_state.json   — Persistent short-term queue/summary state (survives restart)
+├── working_context.json — Persistent working context state (survives restart)
 └── .env               — API keys (not committed)
 ```
 
@@ -130,22 +134,27 @@ python samantha.py
 
 This project is under active development. Current architectural gaps identified through research:
 
-### 1. Short-term memory eviction without summarization
+### 1. Short-term memory eviction without summarization — ✅ Resolved
 
-**Current**: When `short_term` exceeds 6 messages, older messages are permanently deleted.  
-**MemGPT approach**: Evicted messages should be recursively summarized and prepended to the queue — preserving context without bloating the window.
+**Bottleneck**: Evicted messages were gone for good — no way to recover the context they held.
+**Was**: When `short_term` exceeded 6 messages, older messages were permanently deleted.
+**Now**: `queue_manager.py` evicts old messages but recursively summarizes them into `recursive_summary` first, so rough context survives even after eviction.
 
-### 2. Python-driven memory saving vs. LLM self-directed saving
+### 2. No token-aware queue management — ✅ Resolved
 
-**Current**: `save_inference()` is called by Python on every turn, regardless of whether the content is meaningful.  
-**MemGPT approach**: The LLM itself should decide when information is worth saving, using function calling (tool use).
+**Bottleneck**: A fixed message count doesn't track actual context usage, so eviction could trigger too early (short messages) or too late (long messages).
+**Was**: Memory eviction was based on message count (n=6), not actual token usage.
+**Now**: `queue_manager.py` tracks token usage, issues a memory-pressure warning at 70% capacity, and flushes at 90% — evicting only enough old messages to fit a token budget, not a fixed count.
 
-### 3. No token-aware queue management
+### 3. Python-driven memory saving vs. LLM self-directed saving — ✅ Resolved
 
-**Current**: Memory eviction is based on message count (n=6), not actual token usage.  
-**MemGPT approach**: A queue manager monitors token consumption, issues memory pressure warnings at ~70% capacity, and flushes at ~100% — storing evicted messages in recall storage for later retrieval.
+**Bottleneck**: Samantha's memory was split across 3 structures instead of MemGPT's clean design, and every memory write/read was Python-automatic — `inference.py` generated a "user insight" every single turn regardless of relevance, `memory.py` conflated recall storage and archival storage in one file, there was no working context at all, and even recall storage's search ran unconditionally every turn rather than being triggered by the LLM's own judgment.
+**Was**: `inference.py` forced an insight per turn; `memory.py` auto-wrote and auto-searched a single blended storage; no working context existed.
+**Now**: `inference.py` deleted. `recall_memory.py` (recall storage) and `archival_memory.py` (archival storage) are separate modules, and `working_context.py` holds stable facts (name, preferences, and other important information) that stay in every prompt. All reading/writing of recall storage, archival storage, and working context is unified behind Claude tool use (`search_recall_memory`, `search_archival_memory`, `save_to_archival_memory`, `update_working_context`) in `samantha.py` — the LLM itself decides when to call each one, matching MemGPT's self-directed memory editing (Section 2.3).
 
 > Reference: _MemGPT: Towards LLMs as Operating Systems_ (Packer et al., 2023) — [arxiv:2310.08560](https://arxiv.org/abs/2310.08560)
+
+
 
 ---
 
@@ -158,21 +167,7 @@ This project is under active development. Current architectural gaps identified 
 | Phase 3 | Emotion detection, emotion-aware responses  | ✅ Done        |
 | Phase 4 | Persona system, relationship engine         | ✅ Done        |
 | Phase 5 | Voice & real-time interface                 | ⏸ Deferred     |
-| Phase 6 | Learning & adaptation (inference engine)    | 🔄 In progress |
+| Phase 6 | Learning & adaptation (memory split + working context) | ✅ Done |
 | Phase 7 | Research integration                        | 📅 Planned     |
-
----
-
-## method for improving Samantha reading paper
-
-1. MemGPT paper
-   2. edit information to memory using "Python" functions -> LLM's self-editing memory / function calling
-      (대화에서의 나의 정보를 python에서 직접 함수 호출 후 저장 -> LLM이 정보를 판단하고 스스로 함수 호출하여 저장)
-
-   Why I use this:
-   What I learned from this:
-
-- Only the conversation is stored when I typed "종료(end)" before turn it off. IF I didn't do it, Samantha will not store our conversation.
-- If my sentences got long, the time which Samantha think and respond is too long.
 
 ---

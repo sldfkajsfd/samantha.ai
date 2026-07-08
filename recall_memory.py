@@ -1,6 +1,10 @@
 from sentence_transformers import SentenceTransformer
 import chromadb
 
+# Recall storage (MemGPT sense): raw conversation log, written automatically and unconditionally
+# by queue_manager.py's flush() with no LLM judgment involved. For LLM-curated important facts,
+# see archival_memory.py instead. (recall storage: queue_manager.py의 flush()가 LLM 판단 없이
+# 무조건 자동으로 쓰는 원문 대화 로그. LLM이 판단해서 쓰는 중요 정보는 archival_memory.py 참고)
 model = SentenceTransformer("all-MiniLM-L6-v2")
 client = chromadb.PersistentClient(path="./memory_db")
 collection = client.get_or_create_collection("samantha")
