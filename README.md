@@ -160,14 +160,14 @@ This project is under active development. Current architectural gaps identified 
 
 ## Roadmap
 
-| Phase   | Focus                                       | Status         |
-| ------- | ------------------------------------------- | -------------- |
-| Phase 1 | Python environment, basic conversation loop | ✅ Done        |
-| Phase 2 | ChromaDB long-term memory, vector search    | ✅ Done        |
-| Phase 3 | Emotion detection, emotion-aware responses  | ✅ Done        |
-| Phase 4 | Persona system, relationship engine         | ✅ Done        |
-| Phase 5 | Voice & real-time interface                 | ⏸ Deferred     |
-| Phase 6 | Learning & adaptation (memory split + working context) | ✅ Done |
-| Phase 7 | Research integration                        | 📅 Planned     |
+| Phase   | Focus                                                  | Status     |
+| ------- | ------------------------------------------------------ | ---------- |
+| Phase 1 | Python environment, basic conversation loop            | ✅ Done    |
+| Phase 2 | ChromaDB long-term memory, vector search               | ✅ Done    |
+| Phase 3 | Emotion detection, emotion-aware responses             | ✅ Done    |
+| Phase 4 | Persona system, relationship engine                    | ✅ Done    |
+| Phase 5 | Voice & real-time interface                            | ⏸ Deferred |
+| Phase 6 | Learning & adaptation (memory split + working context) | ✅ Done    |
+| Phase 7 | Research integration                                   | 📅 Planned |
 
 ---
