@@ -1,5 +1,6 @@
 import anthropic
 import os
+import logging
 from dotenv import load_dotenv
 from recall_memory import search_memory as search_recall_memory
 from archival_memory import search_archival_memory, save_archival_memory
@@ -14,6 +15,14 @@ import working_context as wc
 load_dotenv()
 
 client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+
+logging.basicConfig(
+    filename="samantha.log",
+    level=logging.INFO,
+    format="%(asctime)s %(message)s",
+    encoding="utf-8"
+)
+logger = logging.getLogger("samantha")
 
 MEMORY_TOOLS = [
     {
@@ -64,36 +73,44 @@ MEMORY_GUIDE = """
 - 나중에 참고하면 좋을 세부 정보(예: 과거 특정 사건)는 save_to_archival_memory로 저장해.
 - 과거 대화 원문이 필요하면 search_recall_memory를, 저장해둔 중요 사실을 다시 찾아야 하면 search_archival_memory를 사용해.
 - 위 도구들은 필요하다고 판단될 때만 사용하고, 매 턴 무조건 사용할 필요는 없어.
+- 도구를 쓸 때 "이건 기억해둘게", "저장할게" 같은 말을 하지 마. 도구 호출은 네 생각의 배경 작업일 뿐이야. 유저에게는 항상 지금 대화 흐름에 자연스럽게 이어지는 말만 해.
 """
 
 
 def handle_queue_status():
     status = qm.check_status()
+    logger.info(f"[queue] status={status} total_tokens={qm.total_tokens}")
     if status == "warning":
         qm.insert_warning()
+        logger.info("[queue] inserted warning message")
     elif status == "flush":
         qm.flush()
+        logger.info(f"[queue] flushed -> total_tokens={qm.total_tokens}")
 
 
 def execute_tool(name, tool_input):
+    logger.info(f"[tool] call name={name} input={tool_input}")
     if name == "search_recall_memory":
         results = search_recall_memory(tool_input["query"])
-        return "\n".join(results) if results else "(검색 결과 없음)"
-    if name == "search_archival_memory":
+        result = "\n".join(results) if results else "(검색 결과 없음)"
+    elif name == "search_archival_memory":
         results = search_archival_memory(tool_input["query"])
-        return "\n".join(results) if results else "(검색 결과 없음)"
-    if name == "save_to_archival_memory":
+        result = "\n".join(results) if results else "(검색 결과 없음)"
+    elif name == "save_to_archival_memory":
         save_archival_memory(tool_input["text"])
-        return "저장 완료"
-    if name == "update_working_context":
+        result = "저장 완료"
+    elif name == "update_working_context":
         if tool_input.get("replaces"):
             wc.replace_fact(tool_input["replaces"], tool_input["fact"])
         else:
             wc.append_fact(tool_input["fact"])
-        return "working context 갱신 완료"
-    return "알 수 없는 tool"
+        result = "working context 갱신 완료"
+    else:
+        result = "알 수 없는 tool"
+    logger.info(f"[tool] result name={name} -> {result!r}")
+    return result
 
-
+# main loop #
 if __name__ == "__main__":
     while True:
         # Start the conversation via STT (STT를 이용한 대화 시작)
@@ -131,7 +148,11 @@ if __name__ == "__main__":
 
         system_prompt = build_system_prompt(emotion) + MEMORY_GUIDE
 
-        for _ in range(5):
+        logger.info(f"===== turn start ===== user_input={user_input!r} emotion={emotion}")
+
+        # accumulating the replying message from Samantha after functioning tool_use
+        all_texts = []
+        for i in range(5):
             response = client.messages.create(
                 model="claude-haiku-4-5",
                 max_tokens=1024,
@@ -140,8 +161,14 @@ if __name__ == "__main__":
                 messages=messages
             )
 
+            texts = [block.text for block in response.content if block.type == "text"]
+            tool_calls = [(block.name, block.input) for block in response.content if block.type == "tool_use"]
+            logger.info(f"[api] iteration={i} stop_reason={response.stop_reason} texts={texts} tool_calls={tool_calls}")
+
+            all_texts.extend(texts)
+
             if response.stop_reason != "tool_use":
-                reply = "".join(block.text for block in response.content if block.type == "text")
+                reply = "\n\n".join(all_texts)
                 break
 
             messages.append({"role": "assistant", "content": response.content})
@@ -157,6 +184,9 @@ if __name__ == "__main__":
             messages.append({"role": "user", "content": tool_results})
         else:
             reply = "(도구를 너무 많이 호출해서 답변을 못 만들었어.)"
+            logger.info("[api] hit max iterations without a final reply")
+
+        logger.info(f"===== turn end ===== reply={reply!r}")
 
         # Samantha's reply via TTS (TTS를 이용한 사만다의 반응)
         print(f"사만다: {reply}\n")

@@ -152,6 +152,10 @@ This project is under active development. Current architectural gaps identified 
 **Was**: `inference.py` forced an insight per turn; `memory.py` auto-wrote and auto-searched a single blended storage; no working context existed.
 **Now**: `inference.py` deleted. `recall_memory.py` (recall storage) and `archival_memory.py` (archival storage) are separate modules, and `working_context.py` holds stable facts (name, preferences, and other important information) that stay in every prompt. All reading/writing of recall storage, archival storage, and working context is unified behind Claude tool use (`search_recall_memory`, `search_archival_memory`, `save_to_archival_memory`, `update_working_context`) in `samantha.py` — the LLM itself decides when to call each one, matching MemGPT's self-directed memory editing (Section 2.3).
 
+**Bottleneck**: When a tool call was bundled with conversational text in the same response, that text was silently dropped — only the final tool-free iteration's text was ever shown to the user.
+**Was**: `if stop_reason != "tool_use": reply = "".join(texts)` kept only the last iteration's text, discarding any text that accompanied a tool call.
+**Now**: Text from every iteration is accumulated (`all_texts.extend(texts)`) and joined into the final reply, so text bundled with a tool call is no longer lost.
+
 > Reference: _MemGPT: Towards LLMs as Operating Systems_ (Packer et al., 2023) — [arxiv:2310.08560](https://arxiv.org/abs/2310.08560)
 
 

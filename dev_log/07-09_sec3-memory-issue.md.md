@@ -1,9 +1,3 @@
-### 1. In the first conversation, Samantha did not respond accurately.
-
-나: 안녕 나 기억나?  
-사만다:  
-나: ? 뭐야
-
 ### 2. Just on Second turn of talk, she suddenly keep saying about the afraidness of memory storage.
 
 나: 내가 어제 헬스장 갔던 걸 이야기했었나?
